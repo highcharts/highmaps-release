@@ -1,6 +1,6 @@
 /**
- * @license Highmaps JS v1.0.1 (2014-06-12)
- * The map module version 1.0.x is compatible with Highcharts 4.0.x.
+ * @license Highmaps JS v1.0.2 (2014-06-13)
+ * Highmaps as a plugin for Highcharts 4.0.1 or Highstock 2.0.1
  *
  * (c) 2011-2014 Torstein Honsi
  *
@@ -647,7 +647,7 @@ SVGRenderer.prototype.Element.prototype.applyTextStroke = function (textStroke) 
 		firstChild;
 	
 	textStroke = textStroke.split(' ');
-	tspans = elem.children;
+	tspans = elem.getElementsByTagName('tspan');
 	firstChild = elem.firstChild;
 	
 	// In order to get the right y position of the clones, 
@@ -905,8 +905,7 @@ wrap(Pointer.prototype, 'init', function (proceed, chart, options) {
 
 	// Pinch status
 	if (pick(options.mapNavigation.enableTouchZoom, options.mapNavigation.enabled)) {
-		this.pinchX = this.pinchHor = 
-			this.pinchY = this.pinchVert = true;
+		this.pinchX = this.pinchHor = this.pinchY = this.pinchVert = this.hasZoom = true;
 	}
 });
 
@@ -916,7 +915,7 @@ wrap(Pointer.prototype, 'pinchTranslate', function (proceed, pinchDown, touches,
 	proceed.call(this, pinchDown, touches, transform, selectionMarker, clip, lastValidTouch);
 
 	// Keep ratio
-	if (this.chart.options.chart.type === 'map') {
+	if (this.chart.options.chart.type === 'map' && this.hasZoom) {
 		xBigger = transform.scaleX > transform.scaleY;
 		this.pinchTranslateDirection(
 			!xBigger, 

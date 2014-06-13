@@ -2908,7 +2908,7 @@ if (CanvasRenderingContext2D) {
 		});
 	}
 }/**
- * @license Highmaps JS v1.0.1 (2014-06-12)
+ * @license Highmaps JS v1.0.2 (2014-06-13)
  * CanVGRenderer Extension module
  *
  * (c) 2011-2012 Torstein Honsi, Erik Olsson

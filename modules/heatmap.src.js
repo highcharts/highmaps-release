@@ -1,5 +1,5 @@
 /**
- * @license Highmaps JS v1.0.1 (2014-06-12)
+ * @license Highmaps JS v1.0.2 (2014-06-13)
  *
  * (c) 2011-2014 Torstein Honsi
  *
@@ -546,7 +546,7 @@ SVGRenderer.prototype.Element.prototype.applyTextStroke = function (textStroke) 
 		firstChild;
 	
 	textStroke = textStroke.split(' ');
-	tspans = elem.children;
+	tspans = elem.getElementsByTagName('tspan');
 	firstChild = elem.firstChild;
 	
 	// In order to get the right y position of the clones, 
