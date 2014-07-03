@@ -2,7 +2,7 @@
 // @compilation_level SIMPLE_OPTIMIZATIONS
 
 /**
- * @license Highmaps JS v1.0.2 (2014-06-13)
+ * @license Highmaps JS v1.0.3 (2014-07-03)
  *
  * (c) 2009-2014 Torstein Honsi
  *
@@ -57,7 +57,7 @@ var UNDEFINED,
 	charts = [],
 	chartCount = 0,
 	PRODUCT = 'Highmaps',
-	VERSION = '1.0.2',
+	VERSION = '1.0.3',
 
 	// some constants for frequently used strings
 	DIV = 'div',
@@ -1267,8 +1267,8 @@ defaultOptions = {
 	global: {
 		useUTC: true,
 		//timezoneOffset: 0,
-		canvasToolsURL: 'http://code.highcharts.com/maps/1.0.2/modules/canvas-tools.js',
-		VMLRadialGradientURL: 'http://code.highcharts.com/maps/1.0.2/gfx/vml-radial-gradient.png'
+		canvasToolsURL: 'http://code.highcharts.com/maps/1.0.3/modules/canvas-tools.js',
+		VMLRadialGradientURL: 'http://code.highcharts.com/maps/1.0.3/gfx/vml-radial-gradient.png'
 	},
 	chart: {
 		//animation: true,
@@ -1323,7 +1323,7 @@ defaultOptions = {
 		margin: 15,
 		// x: 0,
 		// verticalAlign: 'top',
-		// y: null, // docs: since 4.0.2 it depends on the font size
+		// y: null,
 		style: {
 			color: '#333333',
 			fontSize: '18px'
@@ -1370,8 +1370,8 @@ defaultOptions = {
 				states: { // states for a single point
 					hover: {
 						enabled: true,
-						lineWidthPlus: 1, // docs
-						radiusPlus: 2 // docs
+						lineWidthPlus: 1,
+						radiusPlus: 2
 					},
 					select: {
 						fillColor: '#FFFFFF',
@@ -1504,7 +1504,7 @@ defaultOptions = {
 		labelStyle: {
 			fontWeight: 'bold',
 			position: RELATIVE,
-			top: '45%' // docs
+			top: '45%'
 		},
 		// showDuration: 0,
 		style: {
@@ -2701,11 +2701,12 @@ SVGElement.prototype = {
 				.replace(/dot/g, '1,3,')
 				.replace('dash', '4,3,')
 				.replace(/,$/, '')
+				.replace('solid', 1)
 				.split(','); // ending comma
 
 			i = value.length;
 			while (i--) {
-				value[i] = pInt(value[i]) * this.element.getAttribute('stroke-width');
+				value[i] = pInt(value[i]) * this['stroke-width'];
 			}
 			value = value.join(',');
 			this.element.setAttribute('stroke-dasharray', value);
@@ -6116,7 +6117,7 @@ Axis.prototype = {
 	defaultBottomAxisOptions: {
 		labels: {
 			x: 0,
-			y: null // based on font size // docs
+			y: null // based on font size
 			// overflow: undefined,
 			// staggerLines: null
 		},
@@ -6804,6 +6805,8 @@ Axis.prototype = {
 		var axis = this,
 			chart = axis.chart,
 			options = axis.options,
+			startOnTick = options.startOnTick,
+			endOnTick = options.endOnTick,
 			isLog = axis.isLog,
 			isDatetimeAxis = axis.isDatetimeAxis,
 			isXAxis = axis.isXAxis,
@@ -6896,7 +6899,7 @@ Axis.prototype = {
 			);
 			// For squished axes, set only two ticks
 			if (!defined(tickIntervalOption) && axis.len < tickPixelIntervalOption && !this.isRadial &&
-					!this.isLog && !categories && options.startOnTick && options.endOnTick) {
+					!this.isLog && !categories && startOnTick && endOnTick) {
 				keepTwoTicksOnly = true;
 				axis.tickInterval /= 4; // tick extremes closer to the real values
 			}
@@ -6986,13 +6989,18 @@ Axis.prototype = {
 				minPointOffset = axis.minPointOffset || 0,
 				singlePad;
 
-			if (options.startOnTick) {
+			// Prevent all ticks from being removed (#3195)
+			if (!startOnTick && !endOnTick && !categories && tickPositions.length === 2) {
+				tickPositions.splice(1, 0, (roundedMax + roundedMin) / 2);
+			}
+
+			if (startOnTick) {
 				axis.min = roundedMin;
 			} else if (axis.min - minPointOffset > roundedMin) {
 				tickPositions.shift();
 			}
 
-			if (options.endOnTick) {
+			if (endOnTick) {
 				axis.max = roundedMax;
 			} else if (axis.max + minPointOffset < roundedMax) {
 				tickPositions.pop();
@@ -8804,7 +8812,7 @@ Pointer.prototype = {
 			size,
 			mouseDownX = this.mouseDownX,
 			mouseDownY = this.mouseDownY,
-			panKey = chartOptions.panKey && e[chartOptions.panKey + 'Key']; // docs
+			panKey = chartOptions.panKey && e[chartOptions.panKey + 'Key'];
 
 		// If the mouse is outside the plot area, adjust to cooordinates
 		// inside to prevent the selection marker from going outside
@@ -8992,8 +9000,8 @@ Pointer.prototype = {
 
 		hoverChartIndex = chart.index;
 
-		// normalize
 		e = this.normalize(e);		
+		e.returnValue = false; // #2251, #3224
 		
 		if (chart.mouseIsDown === 'mousedown') {
 			this.drag(e);
@@ -11691,7 +11699,7 @@ Point.prototype = {
 	applyOptions: function (options, x) {
 		var point = this,
 			series = point.series,
-			pointValKey = series.pointValKey;
+			pointValKey = series.options.pointValKey || series.pointValKey;
 
 		options = Point.prototype.optionsToObject.call(this, options);
 
@@ -14194,7 +14202,7 @@ var ColumnSeries = extendClass(Series, {
 			minPointLength = pick(options.minPointLength, 5),
 			metrics = series.getColumnMetrics(),
 			pointWidth = metrics.width,
-			seriesBarW = series.barW = mathCeil(mathMax(pointWidth, 1 + 2 * borderWidth)), // rounded and postprocessed for border width
+			seriesBarW = series.barW = mathMax(pointWidth, 1 + 2 * borderWidth), // postprocessed for border width
 			pointXOffset = series.pointXOffset = metrics.offset,
 			xCrisp = -(borderWidth % 2 ? 0.5 : 0),
 			yCrisp = borderWidth % 2 ? 0.5 : 1;
@@ -14203,9 +14211,16 @@ var ColumnSeries = extendClass(Series, {
 			yCrisp += 1;
 		}
 
+		// When the pointPadding is 0, we want the columns to be packed tightly, so we allow individual
+		// columns to have individual sizes. When pointPadding is greater, we strive for equal-width
+		// columns (#2694).
+		if (options.pointPadding) {
+			seriesBarW = mathCeil(seriesBarW);
+		}
+
 		Series.prototype.translate.apply(series);
 
-		// record the new values
+		// Record the new values
 		each(series.points, function (point) {
 			var yBottom = pick(point.yBottom, translatedThreshold),
 				plotY = mathMin(mathMax(-999 - yBottom, point.plotY), yAxis.len + 999 + yBottom), // Don't draw too far outside plot area (#1303, #2241)
@@ -14215,7 +14230,6 @@ var ColumnSeries = extendClass(Series, {
 				right,
 				bottom,
 				fromTop,
-				fromLeft,
 				barH = mathMax(plotY, yBottom) - barY;
 
 			// Handle options.minPointLength
@@ -14236,8 +14250,7 @@ var ColumnSeries = extendClass(Series, {
 			// Fix the tooltip on center of grouped columns (#1216)
 			point.tooltipPos = chart.inverted ? [yAxis.len - plotY, series.xAxis.len - barX - barW / 2] : [barX + barW / 2, plotY];
 
-			// Round off to obtain crisp edges
-			fromLeft = mathAbs(barX) < 0.5;
+			// Round off to obtain crisp edges and avoid overlapping with neighbours (#2694)
 			right = mathRound(barX + barW) + xCrisp;
 			barX = mathRound(barX) + xCrisp;
 			barW = right - barX;
@@ -14247,11 +14260,7 @@ var ColumnSeries = extendClass(Series, {
 			barY = mathRound(barY) + yCrisp;
 			barH = bottom - barY;
 
-			// Top and left edges are exceptions
-			if (fromLeft) {
-				barX += 1;
-				barW -= 1;
-			}
+			// Top edges are exceptions
 			if (fromTop) {
 				barY -= 1;
 				barH += 1;
@@ -14265,6 +14274,7 @@ var ColumnSeries = extendClass(Series, {
 				width: barW,
 				height: barH
 			};
+
 		});
 
 	},
@@ -14751,6 +14761,7 @@ if (seriesTypes.pie) {
 				usedSlots = [],
 				points = halves[i],
 				pos,
+				bottom,
 				length = points.length,
 				slotIndex;
 
@@ -14771,14 +14782,15 @@ if (seriesTypes.pie) {
 			// Only do anti-collision when we are outside the pie and have connectors (#856)
 			if (distanceOption > 0) {
 
-				// build the slots
-				for (pos = centerY - radius - distanceOption; pos <= centerY + radius + distanceOption; pos += labelHeight) {
+				// Build the slots
+				bottom = mathMin(centerY + radius + distanceOption, chart.plotHeight);
+				for (pos = mathMax(0, centerY - radius - distanceOption); pos <= bottom; pos += labelHeight) {
 					slots.push(pos);
 				}
 				slotsLength = slots.length;
 
 
-				/* visualize the slota
+				/* Visualize the slots
 				if (!series.slotElements) {
 					series.slotElements = [];
 				}
@@ -14891,7 +14903,7 @@ if (seriesTypes.pie) {
 					y = slot.y;
 					if ((naturalY > y && slots[slotIndex + 1] !== null) ||
 							(naturalY < y &&  slots[slotIndex - 1] !== null)) {
-						y = naturalY;
+						y = mathMin(mathMax(0, naturalY), chart.plotHeight);
 					}
 
 				} else {
@@ -14902,7 +14914,7 @@ if (seriesTypes.pie) {
 				// and botton slice connectors from touching each other on either side
 				x = options.justify ?
 					seriesCenter[0] + (i ? -1 : 1) * (radius + distanceOption) :
-					series.getX(slotIndex === 0 || slotIndex === slots.length - 1 ? naturalY : y, i);
+					series.getX(y === centerY - radius - distanceOption || y === centerY + radius + distanceOption ? naturalY : y, i);
 
 
 				// Record the placement and visibility
@@ -15703,6 +15715,7 @@ var colorSeriesMixin = {
 	trackerGroups: ['group', 'markerGroup', 'dataLabelsGroup'],
 	getSymbol: noop,
 	parallelArrays: ['x', 'y', 'value'],
+	colorKey: 'value',
 	
 	/**
 	 * In choropleth maps, the color is a result of the value, so this needs translation too
@@ -15710,10 +15723,11 @@ var colorSeriesMixin = {
 	translateColors: function () {
 		var series = this,
 			nullColor = this.options.nullColor,
-			colorAxis = this.colorAxis;
+			colorAxis = this.colorAxis,
+			colorKey = this.colorKey;
 
 		each(this.data, function (point) {
-			var value = point.value,
+			var value = point[colorKey],
 				color;
 
 			color = value === null ? nullColor : (colorAxis && value !== undefined) ? colorAxis.toColor(value, point) : point.color || series.color;
@@ -16176,6 +16190,14 @@ seriesTypes.map = extendClass(seriesTypes.scatter, merge(colorSeriesMixin, {
 	 * we skip it now and call it from drawPoints instead.
 	 */
 	drawDataLabels: noop,
+
+	/**
+	 * Allow a quick redraw by just translating the area group. Used for zooming and panning
+	 * in capable browsers.
+	 */
+	doFullTranslate: function () {
+		return this.isDirtyData || this.chart.renderer.isVML || !this.baseTrans;
+	},
 	
 	/**
 	 * Add the path option for data points. Find the max value for color calculation.
@@ -16183,7 +16205,8 @@ seriesTypes.map = extendClass(seriesTypes.scatter, merge(colorSeriesMixin, {
 	translate: function () {
 		var series = this,
 			xAxis = series.xAxis,
-			yAxis = series.yAxis;
+			yAxis = series.yAxis,
+			doFullTranslate = series.doFullTranslate();
 
 		series.generatePoints();
 		
@@ -16194,7 +16217,7 @@ seriesTypes.map = extendClass(seriesTypes.scatter, merge(colorSeriesMixin, {
 			point.plotX = xAxis.toPixels(point._midX, true);
 			point.plotY = yAxis.toPixels(point._midY, true);
 
-			if (series.isDirtyData || series.chart.renderer.isVML) {
+			if (doFullTranslate) {
 		
 				point.shapeType = 'path';
 				point.shapeArgs = {
@@ -16237,7 +16260,7 @@ seriesTypes.map = extendClass(seriesTypes.scatter, merge(colorSeriesMixin, {
 		}
 		
 		// Draw the shapes again
-		if (series.isDirtyData || renderer.isVML || !baseTrans) {
+		if (series.doFullTranslate()) {
 
 			// Individual point actions	
 			if (chart.hasRendered && series.pointAttrToOptions.fill === 'color') {
@@ -17068,7 +17091,7 @@ Axis.prototype.beforePadding = function () {
 					// Find the min and max Z
 					zData = series.zData;
 					if (zData.length) { // #1735
-						zMin = pick(seriesOptions.zMin, math.min( // docs: zMin, zMax (plotoptions/bubble-zmin-zmax)
+						zMin = pick(seriesOptions.zMin, math.min(
 							zMin,
 							math.max(
 								arrayMin(zData), 
@@ -18192,7 +18215,7 @@ extend(Series.prototype, {
 			}
 
 			if (state) {
-				lineWidth = stateOptions[state].lineWidth || lineWidth + (stateOptions[state].lineWidthPlus || 0); // docs
+				lineWidth = stateOptions[state].lineWidth || lineWidth + (stateOptions[state].lineWidthPlus || 0);
 			}
 
 			if (graph && !graph.dashstyle) { // hover is turned off for dashed lines in VML

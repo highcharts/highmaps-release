@@ -1,5 +1,5 @@
 /*
- Highmaps JS v1.0.2 (2014-06-13)
+ Highmaps JS v1.0.3 (2014-07-03)
  Exporting module
 
  (c) 2010-2014 Torstein Honsi

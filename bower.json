@@ -1,8 +1,8 @@
 {
   "name": "highmaps",
-  "version": "v1.0.2",
+  "version": "v1.0.3",
   "main": [
     "highmaps.js",
-    "modules/exporting.src.js"
+    "modules/exporting.js"
   ]
 }

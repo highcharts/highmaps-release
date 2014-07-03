@@ -1,5 +1,5 @@
 /**
- * @license Highmaps JS v1.0.2 (2014-06-13)
+ * @license Highmaps JS v1.0.3 (2014-07-03)
  * Highmaps as a plugin for Highcharts 4.0.1 or Highstock 2.0.1
  *
  * (c) 2011-2014 Torstein Honsi
@@ -599,6 +599,7 @@ var colorSeriesMixin = {
 	trackerGroups: ['group', 'markerGroup', 'dataLabelsGroup'],
 	getSymbol: noop,
 	parallelArrays: ['x', 'y', 'value'],
+	colorKey: 'value',
 	
 	/**
 	 * In choropleth maps, the color is a result of the value, so this needs translation too
@@ -606,10 +607,11 @@ var colorSeriesMixin = {
 	translateColors: function () {
 		var series = this,
 			nullColor = this.options.nullColor,
-			colorAxis = this.colorAxis;
+			colorAxis = this.colorAxis,
+			colorKey = this.colorKey;
 
 		each(this.data, function (point) {
-			var value = point.value,
+			var value = point[colorKey],
 				color;
 
 			color = value === null ? nullColor : (colorAxis && value !== undefined) ? colorAxis.toColor(value, point) : point.color || series.color;
@@ -1334,6 +1336,14 @@ seriesTypes.map = extendClass(seriesTypes.scatter, merge(colorSeriesMixin, {
 	 * we skip it now and call it from drawPoints instead.
 	 */
 	drawDataLabels: noop,
+
+	/**
+	 * Allow a quick redraw by just translating the area group. Used for zooming and panning
+	 * in capable browsers.
+	 */
+	doFullTranslate: function () {
+		return this.isDirtyData || this.chart.renderer.isVML || !this.baseTrans;
+	},
 	
 	/**
 	 * Add the path option for data points. Find the max value for color calculation.
@@ -1341,7 +1351,8 @@ seriesTypes.map = extendClass(seriesTypes.scatter, merge(colorSeriesMixin, {
 	translate: function () {
 		var series = this,
 			xAxis = series.xAxis,
-			yAxis = series.yAxis;
+			yAxis = series.yAxis,
+			doFullTranslate = series.doFullTranslate();
 
 		series.generatePoints();
 		
@@ -1352,7 +1363,7 @@ seriesTypes.map = extendClass(seriesTypes.scatter, merge(colorSeriesMixin, {
 			point.plotX = xAxis.toPixels(point._midX, true);
 			point.plotY = yAxis.toPixels(point._midY, true);
 
-			if (series.isDirtyData || series.chart.renderer.isVML) {
+			if (doFullTranslate) {
 		
 				point.shapeType = 'path';
 				point.shapeArgs = {
@@ -1395,7 +1406,7 @@ seriesTypes.map = extendClass(seriesTypes.scatter, merge(colorSeriesMixin, {
 		}
 		
 		// Draw the shapes again
-		if (series.isDirtyData || renderer.isVML || !baseTrans) {
+		if (series.doFullTranslate()) {
 
 			// Individual point actions	
 			if (chart.hasRendered && series.pointAttrToOptions.fill === 'color') {
