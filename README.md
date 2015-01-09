@@ -1,4 +1,4 @@
-highstock-release
+highmaps-release
 =================
 
 Official shim repo for Highmaps releases
