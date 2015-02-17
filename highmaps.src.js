@@ -2,7 +2,7 @@
 // @compilation_level SIMPLE_OPTIMIZATIONS
 
 /**
- * @license Highmaps JS v1.1.0 (2015-02-16)
+ * @license Highmaps JS v1.1.1 (2015-02-17)
  *
  * (c) 2009-2014 Torstein Honsi
  *
@@ -56,7 +56,7 @@ var UNDEFINED,
 	charts = [],
 	chartCount = 0,
 	PRODUCT = 'Highmaps',
-	VERSION = '1.1.0',
+	VERSION = '1.1.1',
 
 	// some constants for frequently used strings
 	DIV = 'div',
@@ -1259,8 +1259,8 @@ defaultOptions = {
 	global: {
 		useUTC: true,
 		//timezoneOffset: 0,
-		canvasToolsURL: 'http://code.highcharts.com/maps/1.1.0/modules/canvas-tools.js',
-		VMLRadialGradientURL: 'http://code.highcharts.com/maps/1.1.0/gfx/vml-radial-gradient.png'
+		canvasToolsURL: 'http://code.highcharts.com/maps/1.1.1/modules/canvas-tools.js',
+		VMLRadialGradientURL: 'http://code.highcharts.com/maps/1.1.1/gfx/vml-radial-gradient.png'
 	},
 	chart: {
 		//animation: true,
@@ -7418,6 +7418,10 @@ Axis.prototype = {
 
 		redraw = pick(redraw, true); // defaults to true
 
+		each(axis.series, function (serie) {
+			delete serie.kdTree;
+		});
+
 		// Extend the arguments with min and max
 		eventArguments = extend(eventArguments, {
 			min: newMin,
@@ -9029,7 +9033,7 @@ Pointer.prototype = {
 			distance = chart.chartWidth,
 			rdistance = chart.chartWidth,
 			anchor,
-
+			noSharedTooltip,
 			kdpoints = [],
 			kdpoint;
 
@@ -9042,12 +9046,13 @@ Pointer.prototype = {
 				}
 			}
 		}
-		
-		if (shared || !hoverSeries) {
+
+		if (!(hoverSeries && hoverSeries.noSharedTooltip) && (shared || !hoverSeries)) { // #3821 
 			// Find nearest points on all series
 			each(series, function (s) {
 				// Skip hidden series
-				if (s.visible && pick(s.options.enableMouseTracking, true)) {
+				noSharedTooltip = s.noSharedTooltip && shared;
+				if (s.visible && !noSharedTooltip && pick(s.options.enableMouseTracking, true)) { // #3821
 					kdpoints.push(s.searchPoint(e));
 				}
 			});
@@ -13164,7 +13169,9 @@ Series.prototype = {
 			chart[sharedClipKey] = clipRect = renderer.clipRect(clipBox);
 			
 		}
-		clipRect.count += 1;
+		if (animation) {
+			clipRect.count += 1;
+		}
 
 		if (this.options.clip !== false) {
 			this.group.clip(animation || seriesClipBox ? clipRect : chart.clipRect);
@@ -13175,7 +13182,7 @@ Series.prototype = {
 		// Remove the shared clipping rectancgle when all series are shown
 		if (!animation) {
 			clipRect.count -= 1;
-			if (clipRect.count === 0 && sharedClipKey && chart[sharedClipKey]) {
+			if (clipRect.count <= 0 && sharedClipKey && chart[sharedClipKey]) {
 				if (!seriesClipBox) {
 					chart[sharedClipKey] = chart[sharedClipKey].destroy();
 				}
@@ -14296,7 +14303,7 @@ extend(Point.prototype, {
 			i,
 			chart = series.chart,
 			seriesOptions = series.options,
-			names = series.xAxis.names;
+			names = series.xAxis && series.xAxis.names;
 
 		redraw = pick(redraw, true);
 
@@ -14455,6 +14462,7 @@ extend(Series.prototype, {
 		}
 
 		// redraw
+		delete series.kdTree; // #3816 kdTree has to be rebuild.
 		series.isDirty = true;
 		series.isDirtyData = true;
 		if (redraw) {
@@ -14487,6 +14495,7 @@ extend(Series.prototype, {
 				}
 
 				// redraw
+				delete series.kdTree; // #3816 kdTree has to be rebuild.
 				series.isDirty = true;
 				series.isDirtyData = true;
 				if (redraw) {
@@ -15814,7 +15823,7 @@ if (seriesTypes.column) {
 
 
 /**
- * @license Highmaps JS v1.1.0 (2015-02-16)
+ * Highmaps JS v1.1.1 (2015-02-17)
  * Highcharts module to hide overlapping data labels. This module is included by default in Highmaps.
  *
  * (c) 2010-2014 Torstein Honsi
@@ -17248,7 +17257,7 @@ seriesTypes.map = extendClass(seriesTypes.scatter, merge(colorSeriesMixin, {
 		seriesTypes.column.prototype.animateDrillupTo.call(this, init);
 	}
 }));/**
- * @license Highmaps JS v1.1.0 (2015-02-16)
+ * Highmaps JS v1.1.1 (2015-02-17)
  * Highcharts module to hide overlapping data labels. This module is included by default in Highmaps.
  *
  * (c) 2010-2014 Torstein Honsi
