@@ -1,5 +1,5 @@
 /**
- * @license Highmaps JS v1.1.1 (2015-02-17)
+ * @license Highmaps JS v1.1.2 (2015-02-27)
  * Highmaps as a plugin for Highcharts 4.0.x or Highstock 2.0.x (x being the patch version of this file)
  *
  * (c) 2011-2014 Torstein Honsi
@@ -439,8 +439,7 @@ extend(ColorAxis.prototype, {
 		}
 	},
 	drawCrosshair: function (e, point) {
-		var newCross = !this.cross,
-			plotX = point && point.plotX,
+		var plotX = point && point.plotX,
 			plotY = point && point.plotY,
 			crossPos,
 			axisPos = this.pos,
@@ -460,7 +459,7 @@ extend(ColorAxis.prototype, {
 			point.plotX = plotX;
 			point.plotY = plotY;
 			
-			if (!newCross && this.cross) {
+			if (this.cross) {
 				this.cross
 					.attr({
 						fill: this.crosshair.color
@@ -665,6 +664,7 @@ extend(Chart.prototype, {
 				if (buttons.hasOwnProperty(n)) {
 					buttonOptions = merge(options.buttonOptions, buttons[n]);
 					attr = buttonOptions.theme;
+					attr.style = merge(buttonOptions.theme.style, buttonOptions.style); // #3203
 					states = attr.states;
 					button = chart.renderer.button(
 							buttonOptions.text, 
@@ -682,8 +682,7 @@ extend(Chart.prototype, {
 							height: buttonOptions.height,
 							title: chart.options.lang[n],
 							zIndex: 5
-						})
-						.css(buttonOptions.style)
+						})					
 						.add();
 					button.handler = buttonOptions.onclick;
 					button.align(extend(buttonOptions, { width: button.width, height: 2 * button.height }), null, buttonOptions.alignTo);
@@ -1731,7 +1730,8 @@ defaultOptions.plotOptions.heatmap = merge(defaultOptions.plotOptions.scatter, {
 		inside: true,
 		verticalAlign: 'middle',
 		crop: false,
-		overflow: false
+		overflow: false,
+		padding: 0 // #3837
 	},
 	marker: null,
 	tooltip: {

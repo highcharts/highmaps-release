@@ -1,6 +1,6 @@
 {
   "name": "highmaps",
-  "version": "v1.1.1",
+  "version": "v1.1.2",
   "main": [
     "highmaps.js",
     "modules/exporting.js"
