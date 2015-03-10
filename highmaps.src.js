@@ -2,7 +2,7 @@
 // @compilation_level SIMPLE_OPTIMIZATIONS
 
 /**
- * @license Highmaps JS v1.1.3 (2015-02-27)
+ * @license Highmaps JS v1.1.4 (2015-03-10)
  *
  * (c) 2009-2014 Torstein Honsi
  *
@@ -56,7 +56,7 @@ var UNDEFINED,
 	charts = [],
 	chartCount = 0,
 	PRODUCT = 'Highmaps',
-	VERSION = '1.1.3',
+	VERSION = '1.1.4',
 
 	// some constants for frequently used strings
 	DIV = 'div',
@@ -149,8 +149,8 @@ function merge() {
 					value = original[key];
 
 					// Copy the contents of objects, but not arrays or DOM nodes
-					if (value && typeof value === 'object' && Object.prototype.toString.call(value) !== '[object Array]'
-							&& key !== 'renderTo' && typeof value.nodeType !== 'number') {
+					if (value && typeof value === 'object' && Object.prototype.toString.call(value) !== '[object Array]' &&
+							key !== 'renderTo' && typeof value.nodeType !== 'number') {
 						copy[key] = doCopy(copy[key] || {}, value);
 				
 					// Primitives and arrays are copied over directly
@@ -1259,8 +1259,8 @@ defaultOptions = {
 	global: {
 		useUTC: true,
 		//timezoneOffset: 0,
-		canvasToolsURL: 'http://code.highcharts.com/maps/1.1.3/modules/canvas-tools.js',
-		VMLRadialGradientURL: 'http://code.highcharts.com/maps/1.1.3/gfx/vml-radial-gradient.png'
+		canvasToolsURL: 'http://code.highcharts.com/maps/1.1.4/modules/canvas-tools.js',
+		VMLRadialGradientURL: 'http://code.highcharts.com/maps/1.1.4/gfx/vml-radial-gradient.png'
 	},
 	chart: {
 		//animation: true,
@@ -1768,7 +1768,8 @@ var Color = function (input) {
 		get: get,
 		brighten: brighten,
 		rgba: rgba,
-		setOpacity: setOpacity
+		setOpacity: setOpacity,
+		raw: input
 	};
 };
 
@@ -2858,17 +2859,22 @@ SVGElement.prototype = {
 			otherZIndex,
 			element = this.element,
 			inserted,
+			run = this.added,
 			i;
 		
 		if (defined(value)) {
 			element.setAttribute(key, value); // So we can read it for other elements in the group
-			this[key] = +value;
+			value = +value;
+			if (this[key] === value) { // Only update when needed (#3865)
+				run = false;
+			}
+			this[key] = value;
 		}
 
 		// Insert according to this and other elements' zIndex. Before .add() is called,
 		// nothing is done. Then on add, or by later calls to zIndexSetter, the node
 		// is placed on the right place in the DOM.
-		if (this.added) {
+		if (run) {
 			value = this.zIndex;
 
 			if (value && parentGroup) {
@@ -4152,7 +4158,11 @@ SVGRenderer.prototype = {
 			if (x !== text.x || y !== text.y) {
 				text.attr('x', x);
 				if (y !== UNDEFINED) {
-					text.attr('y', y);
+					// As a workaround for #3649, use translation instead of y attribute. #3649
+					// is a rendering bug in WebKit for Retina (Mac, iOS, PhantomJS) that 
+					// results in duplicated text when an y attribute is used in combination 
+					// with a CSS text-style.
+					text.attr(text.element.nodeName === 'SPAN' ? 'y' : 'translateY', y);
 				}
 			}
 
@@ -6933,17 +6943,18 @@ Axis.prototype = {
 			linkedParent = axis.linkedParent,
 			ordinalCorrection,
 			hasCategories = !!axis.categories,
-			transA = axis.transA;
+			transA = axis.transA,
+			isXAxis = axis.isXAxis;
 
 		// Adjust translation for padding. Y axis with categories need to go through the same (#1784).
-		if (axis.isXAxis || hasCategories || pointRange) {
+		if (isXAxis || hasCategories || pointRange) {
 			if (linkedParent) {
 				minPointOffset = linkedParent.minPointOffset;
 				pointRangePadding = linkedParent.pointRangePadding;
 
 			} else {
 				each(axis.series, function (series) {
-					var seriesPointRange = hasCategories ? 1 : (axis.isXAxis ? series.pointRange : (axis.axisPointRange || 0)), // #2806
+					var seriesPointRange = hasCategories ? 1 : (isXAxis ? series.pointRange : (axis.axisPointRange || 0)), // #2806
 						pointPlacement = series.options.pointPlacement,
 						seriesClosestPointRange = series.closestPointRange;
 
@@ -6989,7 +7000,9 @@ Axis.prototype = {
 			// closestPointRange means the closest distance between points. In columns
 			// it is mostly equal to pointRange, but in lines pointRange is 0 while closestPointRange
 			// is some other value
-			axis.closestPointRange = closestPointRange;
+			if (isXAxis) {
+				axis.closestPointRange = closestPointRange;
+			}
 		}
 
 		// Secondary values
@@ -7626,7 +7639,7 @@ Axis.prototype = {
 				each(autoRotation, function (rot) {
 					var score;
 
-					if (rot && rot >= -90 && rot <= 90) {
+					if (rot === rotationOption || (rot && rot >= -90 && rot <= 90)) { // #3891
 					
 						step = getStep(mathAbs(labelMetrics.h / mathSin(deg2rad * rot)));
 
@@ -9065,6 +9078,7 @@ Pointer.prototype = {
 			}
 		}
 
+		// Handle shared tooltip or cases where a series is not yet hovered
 		if (!(hoverSeries && hoverSeries.noSharedTooltip) && (shared || !hoverSeries)) { // #3821 
 			// Find nearest points on all series
 			each(series, function (s) {
@@ -9086,35 +9100,43 @@ Pointer.prototype = {
 						kdpoint = p;
 					}
 				}
-				//point = kdpoints[0];
 			});	
+
+		// Handle non-shared tooltips
 		} else {
-			kdpoint = hoverSeries ? hoverSeries.searchPoint(e) : UNDEFINED;
+			// If it has a hoverPoint and that series requires direct touch (like columns), use the hoverPoint (#3899).
+			// Otherwise, search the k-d tree (like scatter).
+			kdpoint = (hoverSeries.directTouch && hoverPoint) || (hoverSeries && hoverSeries.searchPoint(e));
 		}
 
-		// Refresh tooltip for kdpoint
-		if (kdpoint && kdpoint !== hoverPoint) {
+		// Refresh tooltip for kdpoint if new hover point or tooltip was hidden // #3926
+		if (kdpoint && (kdpoint !== hoverPoint || (tooltip && tooltip.isHidden))) {
 			// Draw tooltip if necessary
 			if (shared && !kdpoint.series.noSharedTooltip) {
 				i = kdpoints.length;
 				trueXkd = kdpoint.clientX;
 				while (i--) {
 					trueX = kdpoints[i].clientX;
-					if (kdpoints[i].x !== kdpoint.x || trueX !== trueXkd || !defined(kdpoints[i].y) || (kdpoints[i].series.noSharedTooltip || false)) {
+					if (kdpoints[i].x !== kdpoint.x || trueX !== trueXkd || (kdpoints[i].series.noSharedTooltip || false)) {
 						kdpoints.splice(i, 1);
 					}
 				}
-				if (tooltip) {
+				if (kdpoints.length && tooltip) {
 					tooltip.refresh(kdpoints, e);
 				}
+
+				// do mouseover on all points except the closest
 				each(kdpoints, function (point) {
-					point.onMouseOver(e);
-				});
+					if (point !== kdpoint) { 
+						point.onMouseOver(e);
+					}
+				});				
+				kdpoint.onMouseOver(e); // #3919 do mouseover on the closest point last to ensure it is the hoverpoint
 			} else {
-				if (tooltip) {
+				if (tooltip) { 
 					tooltip.refresh(kdpoint, e);
 				}
-				kdpoint.onMouseOver(e);
+				kdpoint.onMouseOver(e); 
 			}
 		
 		// Update positions (regardless of kdpoint or hoverPoint)
@@ -9129,7 +9151,9 @@ Pointer.prototype = {
 		// Start the event listener to pick up the tooltip 
 		if (tooltip && !pointer._onDocumentMouseMove) {
 			pointer._onDocumentMouseMove = function (e) {
-				pointer.onDocumentMouseMove(e);
+				if (charts[hoverChartIndex]) {
+					charts[hoverChartIndex].pointer.onDocumentMouseMove(e);
+				}
 			};
 			addEvent(doc, 'mousemove', pointer._onDocumentMouseMove);
 		}
@@ -9505,6 +9529,7 @@ Pointer.prototype = {
 			plotTop = chart.plotTop;
 		
 		e = this.normalize(e);
+		e.originalEvent = e; // #3913
 		e.cancelBubble = true; // IE specific
 
 		if (!chart.cancelClick) {
@@ -11437,7 +11462,7 @@ Chart.prototype = {
 			
 		// Width and height checks for display:none. Target is doc in IE8 and Opera,
 		// win in Firefox, Chrome and IE9.
-		if (!chart.hasUserSize && width && height && (target === win || target === doc)) {
+		if (!chart.hasUserSize && !chart.isPrinting && width && height && (target === win || target === doc)) { // #1093
 			if (width !== chart.containerWidth || height !== chart.containerHeight) {
 				clearTimeout(chart.reflowTimeout);
 				if (e) { // Called from window.resize
@@ -13755,7 +13780,7 @@ Series.prototype = {
 				series[graphKey] = series.chart.renderer.path(graphPath)
 					.attr(attribs)
 					.add(series.group)
-					.shadow(!i && options.shadow);
+					.shadow((i < 2) && options.shadow); // add shadow to normal series (0) or to first zone (1) #3932
 			}
 		});
 	},
@@ -14049,6 +14074,7 @@ Series.prototype = {
 		var series = this,
 			chart = series.chart,
 			wasDirtyData = series.isDirtyData, // cache it here as it is set to false in render, but used after
+			wasDirty = series.isDirty,
 			group = series.group,
 			xAxis = series.xAxis,
 			yAxis = series.yAxis;
@@ -14070,10 +14096,11 @@ Series.prototype = {
 
 		series.translate();
 		series.render();
-
 		if (wasDirtyData) {
-			delete this.kdTree; // #3868 recalculate the kdtree with dirty data
 			fireEvent(series, 'updatedData');
+		}
+		if (wasDirty || wasDirtyData) {			// #3945 recalculate the kdtree when dirty
+			delete this.kdTree; // #3868 recalculate the kdtree with dirty data
 		}
 	},
 
@@ -14128,9 +14155,12 @@ Series.prototype = {
 			}
 		}
 
-		// Start the recursive build process with a clone of the points array (#3873)
+		// Start the recursive build process with a clone of the points array and null points filtered out (#3873)
 		function startRecursive() {
-			series.kdTree = _kdtree(series.points.slice(), dimensions, dimensions);		
+			var points = grep(series.points, function (point) {
+				return point.y !== null;
+			});
+			series.kdTree = _kdtree(points, dimensions, dimensions);		
 		}
 
 		delete series.kdTree;
@@ -14402,7 +14432,7 @@ extend(Point.prototype, {
 				chart.isDirtyBox = true;
 			}
 
-			if (seriesOptions.legendType === 'point') { // #1831, #1885
+			if (chart.legend.display && seriesOptions.legendType === 'point') { // #1831, #1885, #3934
 				series.updateTotals();
 				chart.legend.clearItems();
 			}
@@ -15889,7 +15919,7 @@ if (seriesTypes.column) {
 
 
 /**
- * Highmaps JS v1.1.3 (2015-02-27)
+ * Highmaps JS v1.1.4 (2015-03-10)
  * Highcharts module to hide overlapping data labels. This module is included by default in Highmaps.
  *
  * (c) 2010-2014 Torstein Honsi
@@ -16149,24 +16179,33 @@ extend(ColorAxis.prototype, {
 
 	/*
 	 * Return an intermediate color between two colors, according to pos where 0
-	 * is the from color and 1 is the to color
+	 * is the from color and 1 is the to color. 
+	 * NOTE: Changes here should be copied
+	 * to the same function in drilldown.src.js.
 	 */
 	tweenColors: function (from, to, pos) {
 		// Check for has alpha, because rgba colors perform worse due to lack of
 		// support in WebKit.
-		var hasAlpha;
+		var hasAlpha,
+			ret;
 
-		from = from.rgba;
-		to = to.rgba;
-		hasAlpha = (to[3] !== 1 || from[3] !== 1);
-		if (!to.length || !from.length) {
+		// Unsupported color, return to-color (#3920)
+		if (!to.rgba.length || !from.rgba.length) {
 			Highcharts.error(23);
+			ret = to.raw;
+
+		// Interpolate
+		} else {
+			from = from.rgba;
+			to = to.rgba;
+			hasAlpha = (to[3] !== 1 || from[3] !== 1);
+			ret = (hasAlpha ? 'rgba(' : 'rgb(') + 
+				Math.round(to[0] + (from[0] - to[0]) * (1 - pos)) + ',' + 
+				Math.round(to[1] + (from[1] - to[1]) * (1 - pos)) + ',' + 
+				Math.round(to[2] + (from[2] - to[2]) * (1 - pos)) + 
+				(hasAlpha ? (',' + (to[3] + (from[3] - to[3]) * (1 - pos))) : '') + ')';
 		}
-		return (hasAlpha ? 'rgba(' : 'rgb(') + 
-			Math.round(to[0] + (from[0] - to[0]) * (1 - pos)) + ',' + 
-			Math.round(to[1] + (from[1] - to[1]) * (1 - pos)) + ',' + 
-			Math.round(to[2] + (from[2] - to[2]) * (1 - pos)) + 
-			(hasAlpha ? (',' + (to[3] + (from[3] - to[3]) * (1 - pos))) : '') + ')';
+		return ret;
 	},
 
 	initDataClasses: function (userOptions) {
@@ -17322,7 +17361,7 @@ seriesTypes.map = extendClass(seriesTypes.scatter, merge(colorSeriesMixin, {
 		seriesTypes.column.prototype.animateDrillupTo.call(this, init);
 	}
 }));/**
- * Highmaps JS v1.1.3 (2015-02-27)
+ * Highmaps JS v1.1.4 (2015-03-10)
  * Highcharts module to hide overlapping data labels. This module is included by default in Highmaps.
  *
  * (c) 2010-2014 Torstein Honsi
@@ -18578,10 +18617,6 @@ var TrackerMixin = Highcharts.TrackerMixin = {
 				var target = e.target,
 				point;
 
-				if (chart.hoverSeries !== series) {
-					series.onMouseOver();
-				}
-
 				while (target && !point) {
 					point = target.point;
 					target = target.parentNode;
@@ -18974,6 +19009,10 @@ extend(Point.prototype, {
 			chart = series.chart,
 			tooltip = chart.tooltip,
 			hoverPoint = chart.hoverPoint;
+
+		if (chart.hoverSeries !== series) {
+			series.onMouseOver();
+		}		
 
 		// set normal state to previous series
 		if (hoverPoint && hoverPoint !== point) {

@@ -1,5 +1,5 @@
 /*
- Highmaps JS v1.1.3 (2015-02-27)
+ Highmaps JS v1.1.4 (2015-03-10)
 
  (c) 2014 Highsoft AS
  Authors: Jon Arild Nygard / Oystein Moseng
