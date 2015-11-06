@@ -3,6 +3,7 @@
   "description": "Official shim repo for Highmaps releases.",
   "homepage": "http://www.highcharts.com",
   "version": "v1.1.9",
+  "main": "highmaps.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/highslide-software/highmaps-release"
