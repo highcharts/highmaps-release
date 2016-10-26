@@ -1,5 +1,5 @@
 /**
- * @license Highmaps JS v5.0.0 (2016-09-29)
+ * @license Highmaps JS v5.0.1 (2016-10-26)
  * Highmaps as a plugin for Highcharts 4.1.x or Highstock 2.1.x (x being the patch version of this file)
  *
  * (c) 2011-2016 Torstein Honsi
@@ -694,6 +694,13 @@
          */
         H.colorPointMixin = {
             /**
+             * Color points have a value option that determines whether or not it is a null point
+             */
+            isValid: function() {
+                return this.value !== null;
+            },
+
+            /**
              * Set the visibility of a single point
              */
             setVisible: function(vis) {
@@ -734,7 +741,7 @@
                         color;
 
                     color = point.options.color ||
-                        (value === null ? nullColor : (colorAxis && value !== undefined) ? colorAxis.toColor(value, point) : point.color || series.color);
+                        (point.isNull ? nullColor : (colorAxis && value !== undefined) ? colorAxis.toColor(value, point) : point.color || series.color);
 
                     if (color) {
                         point.color = color;
@@ -1560,7 +1567,7 @@
                     each(series.points, function(point) {
                         if (point.graphic) {
                             if (point.name) {
-                                point.graphic.addClass('highcharts-name-' + point.name.replace(' ', '-').toLowerCase());
+                                point.graphic.addClass('highcharts-name-' + point.name.replace(/ /g, '-').toLowerCase());
                             }
                             if (point.properties && point.properties['hc-key']) {
                                 point.graphic.addClass('highcharts-key-' + point.properties['hc-key'].toLowerCase());
@@ -1892,7 +1899,7 @@
          * License: www.highcharts.com/license
          */
         'use strict';
-        var extend = H.extend,
+        var merge = H.merge,
             Point = H.Point,
             seriesType = H.seriesType,
             seriesTypes = H.seriesTypes;
@@ -1923,8 +1930,11 @@
                 applyOptions: function(options, x) {
                     var point;
                     if (options && options.lat !== undefined && options.lon !== undefined) {
-                        point = Point.prototype.applyOptions.call(this, options, x);
-                        point = extend(point, this.series.chart.fromLatLonToPoint(point));
+                        point = Point.prototype.applyOptions.call(
+                            this,
+                            merge(options, this.series.chart.fromLatLonToPoint(options)),
+                            x
+                        );
                     } else {
                         point = seriesTypes.map.prototype.pointClass.prototype.applyOptions.call(this, options, x);
                     }
