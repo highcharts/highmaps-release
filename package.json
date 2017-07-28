@@ -2,7 +2,7 @@
   "name": "highmaps-release",
   "description": "Official shim repo for Highmaps releases.",
   "homepage": "http://www.highcharts.com",
-  "version": "v5.0.13",
+  "version": "v5.0.14",
   "main": "highmaps.js",
   "repository": {
     "type": "git",
